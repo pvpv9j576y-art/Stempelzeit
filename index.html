@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<title>Zeiterfassung</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+  :root {
+    --bg:#0a0a0f;--surface:#13131a;--surface2:#1c1c26;--surface3:#252532;
+    --border:rgba(255,255,255,0.07);--text:#f0f0f8;--text2:#8888a8;
+    --green:#00e5a0;--green-dim:rgba(0,229,160,0.12);
+    --red:#ff5c7a;--red-dim:rgba(255,92,122,0.12);
+    --blue:#5b9cf6;--blue-dim:rgba(91,156,246,0.12);
+    --orange:#ff9f43;--orange-dim:rgba(255,159,67,0.12);
+    --purple:#c084fc;--purple-dim:rgba(192,132,252,0.12);
+    --radius:16px;--radius-sm:10px;
+    --safe-top:env(safe-area-inset-top,44px);--safe-bottom:env(safe-area-inset-bottom,34px);
+  }
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  body{font-family:'DM Sans',sans-serif;background:var(--bg);color:var(--text);min-height:100dvh;overflow-x:hidden;-webkit-font-smoothing:antialiased;}
+
+  .header{position:fixed;top:0;left:0;right:0;z-index:100;padding:var(--safe-top) 20px 16px;background:rgba(10,10,15,0.88);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-bottom:1px solid var(--border);}
+  .header-inner{display:flex;align-items:center;justify-content:space-between;}
+  .header-title{font-size:22px;font-weight:700;letter-spacing:-0.5px;}
+  .header-date{font-size:13px;color:var(--text2);font-family:'DM Mono',monospace;margin-top:2px;}
+  .month-nav{display:flex;align-items:center;gap:10px;}
+  .nav-btn{width:34px;height:34px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all 0.15s;-webkit-user-select:none;}
+  .nav-btn:active{transform:scale(0.9);}
+
+  .scroll-content{padding-top:calc(var(--safe-top) + 82px);padding-bottom:calc(var(--safe-bottom) + 100px);padding-left:16px;padding-right:16px;}
+
+  .today-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:20px;margin-bottom:16px;position:relative;overflow:hidden;}
+  .today-card::before{content:'';position:absolute;top:-40px;right:-40px;width:140px;height:140px;background:radial-gradient(circle,rgba(0,229,160,0.07),transparent 70%);pointer-events:none;}
+  .today-label{font-size:11px;text-transform:uppercase;letter-spacing:1.5px;color:var(--text2);margin-bottom:8px;font-weight:600;}
+  .clock-display{font-family:'DM Mono',monospace;font-size:48px;font-weight:500;letter-spacing:-2px;line-height:1;margin-bottom:4px;background:linear-gradient(135deg,#fff 60%,var(--green));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+  .today-weekday{font-size:14px;color:var(--text2);margin-bottom:16px;}
+  .time-buttons{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;}
+  .time-btn{border:none;border-radius:var(--radius-sm);padding:14px 16px;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;cursor:pointer;transition:all 0.2s;display:flex;align-items:center;gap:8px;-webkit-user-select:none;}
+  .time-btn:active{transform:scale(0.96);}
+  .btn-kommen{background:var(--green-dim);color:var(--green);border:1px solid rgba(0,229,160,0.2);}
+  .btn-gehen{background:var(--red-dim);color:var(--red);border:1px solid rgba(255,92,122,0.2);}
+  .btn-pause-start{background:var(--orange-dim);color:var(--orange);border:1px solid rgba(255,159,67,0.2);}
+  .btn-pause-end{background:var(--blue-dim);color:var(--blue);border:1px solid rgba(91,156,246,0.2);}
+  .btn-icon{font-size:18px;}
+  .status-row{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;}
+  .status-chip{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;text-align:center;}
+  .chip-label{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.8px;}
+  .chip-value{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;margin-top:2px;}
+
+  .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:16px;}
+  .stat-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;}
+  .stat-card.full-width{grid-column:1/-1;}
+  .stat-icon{font-size:22px;margin-bottom:8px;}
+  .stat-label{font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:1px;font-weight:600;}
+  .stat-value{font-family:'DM Mono',monospace;font-size:24px;font-weight:500;margin-top:4px;}
+  .stat-sub{font-size:12px;color:var(--text2);margin-top:2px;}
+  .progress-wrap{background:var(--surface2);border-radius:4px;height:6px;margin-top:10px;overflow:hidden;}
+  .progress-bar{height:100%;border-radius:4px;transition:width 0.5s ease;}
+
+  .section-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;margin-top:8px;}
+  .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:var(--text2);}
+  .section-add{width:28px;height:28px;border-radius:50%;background:var(--surface2);border:1px solid var(--border);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-user-select:none;transition:all 0.15s;}
+  .section-add:active{transform:scale(0.9);}
+
+  .special-days{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px;}
+  .special-btn{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:14px 8px;text-align:center;cursor:pointer;transition:all 0.2s;-webkit-user-select:none;display:flex;flex-direction:column;align-items:center;gap:6px;}
+  .special-btn:active{transform:scale(0.95);}
+  .special-btn.active-urlaub{background:var(--blue-dim);border-color:rgba(91,156,246,0.3);}
+  .special-btn.active-krank{background:var(--red-dim);border-color:rgba(255,92,122,0.3);}
+  .special-btn.active-feiertag{background:var(--purple-dim);border-color:rgba(192,132,252,0.3);}
+  .special-emoji{font-size:22px;}
+  .special-label{font-size:11px;font-weight:600;color:var(--text2);}
+  .special-count{font-family:'DM Mono',monospace;font-size:13px;font-weight:500;}
+
+  .soll-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;margin-bottom:16px;}
+  .soll-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;}
+  .soll-title{font-size:16px;font-weight:700;}
+  .soll-edit-btn{font-size:12px;color:var(--blue);background:var(--blue-dim);border:1px solid rgba(91,156,246,0.2);border-radius:6px;padding:4px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;font-weight:600;-webkit-user-select:none;transition:all 0.15s;}
+  .soll-edit-btn:active{transform:scale(0.96);}
+  .soll-days{display:grid;grid-template-columns:repeat(5,1fr);gap:8px;}
+  .soll-day{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 4px;text-align:center;}
+  .soll-day.active-day{background:var(--blue-dim);border-color:rgba(91,156,246,0.3);}
+  .day-name{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:var(--text2);}
+  .day-hours{font-family:'DM Mono',monospace;font-size:15px;font-weight:500;margin-top:4px;color:var(--blue);}
+  .soll-total{margin-top:14px;padding-top:14px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .soll-total-label{font-size:13px;color:var(--text2);}
+  .soll-total-value{font-family:'DM Mono',monospace;font-size:20px;font-weight:600;color:var(--blue);}
+
+  /* ENTRIES */
+  .entries-list{display:flex;flex-direction:column;gap:8px;}
+  .entry-item{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);padding:12px 14px;display:flex;align-items:center;gap:12px;position:relative;overflow:hidden;}
+  .entry-item.type-urlaub{border-left:3px solid var(--blue);}
+  .entry-item.type-krank{border-left:3px solid var(--red);}
+  .entry-item.type-feiertag{border-left:3px solid var(--purple);}
+  .entry-item.type-arbeit{border-left:3px solid var(--green);}
+  .entry-date-col{min-width:42px;text-align:center;}
+  .entry-day-num{font-family:'DM Mono',monospace;font-size:22px;font-weight:500;line-height:1;}
+  .entry-day-name{font-size:10px;color:var(--text2);text-transform:uppercase;letter-spacing:0.5px;}
+  .entry-info{flex:1;min-width:0;}
+  .entry-type{font-size:14px;font-weight:600;}
+  .entry-detail{font-size:11px;color:var(--text2);margin-top:2px;font-family:'DM Mono',monospace;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .entry-actions{display:flex;gap:6px;flex-shrink:0;}
+  .entry-btn{width:30px;height:30px;border-radius:8px;border:none;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;-webkit-user-select:none;transition:all 0.15s;}
+  .entry-btn:active{transform:scale(0.9);}
+  .entry-edit{background:var(--blue-dim);color:var(--blue);}
+  .entry-delete{background:var(--red-dim);color:var(--red);}
+
+  /* EXPORT BTN */
+  .export-btn{width:100%;padding:14px;border-radius:var(--radius-sm);border:1px solid rgba(0,229,160,0.25);background:var(--green-dim);color:var(--green);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.2s;-webkit-user-select:none;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:16px;}
+  .export-btn:active{transform:scale(0.97);}
+
+  /* BOTTOM NAV */
+  .bottom-nav{position:fixed;bottom:0;left:0;right:0;z-index:100;padding:10px 20px var(--safe-bottom);background:rgba(10,10,15,0.92);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px);border-top:1px solid var(--border);display:grid;grid-template-columns:repeat(4,1fr);gap:4px;}
+  .nav-item{display:flex;flex-direction:column;align-items:center;gap:4px;cursor:pointer;padding:6px 8px;border-radius:10px;transition:all 0.15s;-webkit-user-select:none;}
+  .nav-item:active{transform:scale(0.92);}
+  .nav-item.active{background:var(--surface2);}
+  .nav-emoji{font-size:22px;}
+  .nav-label{font-size:10px;font-weight:600;color:var(--text2);letter-spacing:0.3px;}
+  .nav-item.active .nav-label{color:var(--green);}
+
+  .page{display:none;}
+  .page.active{display:block;}
+
+  /* MODAL */
+  .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);z-index:200;display:none;align-items:flex-end;justify-content:center;}
+  .modal-overlay.open{display:flex;}
+  .modal{width:100%;max-width:430px;background:var(--surface);border-radius:24px 24px 0 0;padding:20px 20px calc(var(--safe-bottom) + 20px);border-top:1px solid var(--border);animation:slideUp 0.28s ease;}
+  @keyframes slideUp{from{transform:translateY(100%);}to{transform:translateY(0);}}
+  .modal-handle{width:36px;height:4px;background:var(--surface3);border-radius:2px;margin:0 auto 20px;}
+  .modal-title{font-size:18px;font-weight:700;margin-bottom:20px;letter-spacing:-0.3px;}
+  .form-group{margin-bottom:14px;}
+  .form-label{font-size:12px;color:var(--text2);font-weight:600;text-transform:uppercase;letter-spacing:0.8px;margin-bottom:6px;}
+  .form-input,.form-select{width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:12px 14px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;outline:none;-webkit-appearance:none;}
+  .form-input:focus,.form-select:focus{border-color:var(--blue);}
+  .form-select option{background:var(--surface2);}
+  .form-row{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  .modal-btn{width:100%;padding:15px;border-radius:var(--radius-sm);border:none;font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;cursor:pointer;transition:all 0.2s;-webkit-user-select:none;margin-top:6px;}
+  .modal-btn:active{transform:scale(0.97);}
+  .modal-btn.primary{background:var(--green);color:#000;}
+  .modal-btn.secondary{background:var(--surface2);color:var(--text2);margin-top:8px;}
+
+  /* SETTINGS */
+  .settings-section{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:16px;}
+  .settings-row{display:flex;align-items:center;justify-content:space-between;padding:16px 18px;border-bottom:1px solid var(--border);cursor:pointer;transition:background 0.15s;-webkit-user-select:none;}
+  .settings-row:last-child{border-bottom:none;}
+  .settings-row:active{background:var(--surface2);}
+  .settings-row-left{display:flex;align-items:center;gap:12px;}
+  .settings-icon{width:36px;height:36px;border-radius:9px;display:flex;align-items:center;justify-content:center;font-size:18px;}
+  .settings-text-label{font-size:15px;font-weight:500;}
+  .settings-text-sub{font-size:12px;color:var(--text2);margin-top:1px;}
+  .settings-value{font-family:'DM Mono',monospace;font-size:14px;color:var(--text2);}
+  .toggle{width:44px;height:26px;background:var(--surface3);border-radius:13px;position:relative;cursor:pointer;transition:background 0.2s;-webkit-user-select:none;}
+  .toggle.on{background:var(--green);}
+  .toggle::after{content:'';position:absolute;width:20px;height:20px;background:white;border-radius:50%;top:3px;left:3px;transition:transform 0.2s;box-shadow:0 1px 4px rgba(0,0,0,0.3);}
+  .toggle.on::after{transform:translateX(18px);}
+
+  .chart-bars{display:flex;align-items:flex-end;gap:6px;height:80px;margin-top:14px;}
+  .chart-bar-wrap{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;}
+  .chart-bar{width:100%;border-radius:4px 4px 0 0;min-height:4px;transition:height 0.5s ease;}
+  .chart-bar-label{font-size:9px;color:var(--text2);text-transform:uppercase;font-weight:700;}
+
+  .empty-state{text-align:center;padding:40px 20px;color:var(--text2);}
+  .empty-icon{font-size:40px;margin-bottom:12px;}
+  .empty-text{font-size:15px;}
+
+  .ueber-positive{color:var(--green);}
+  .ueber-negative{color:var(--red);}
+
+  .toast{position:fixed;top:calc(var(--safe-top) + 100px);left:50%;transform:translateX(-50%) translateY(-20px);background:var(--surface3);border:1px solid var(--border);border-radius:20px;padding:10px 20px;font-size:14px;font-weight:600;z-index:300;opacity:0;transition:all 0.3s;white-space:nowrap;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  /* PDF PRINT STYLES */
+  @media print {
+    body{background:#fff!important;color:#000!important;}
+    .header,.bottom-nav,.toast,.modal-overlay,.export-btn,.entry-actions,.time-buttons,.special-days,.today-card .today-label,.clock-display,.today-weekday,.status-row,.chart-bars{display:none!important;}
+    .scroll-content{padding:0!important;}
+    .page{display:block!important;}
+    #page-heute,#page-soll,#page-uebersicht{display:none!important;}
+    #page-eintraege{display:block!important;}
+    .stat-card,.entry-item,.soll-card,.settings-section{background:#fff!important;border:1px solid #ddd!important;color:#000!important;-webkit-print-color-adjust:exact;}
+    .entry-item.type-arbeit{border-left:3px solid #00b874!important;}
+    .entry-item.type-urlaub{border-left:3px solid #2563eb!important;}
+    .entry-item.type-krank{border-left:3px solid #e11d48!important;}
+    .entry-item.type-feiertag{border-left:3px solid #7c3aed!important;}
+    .stat-value,.chip-value,.entry-day-num{color:#000!important;}
+    .stat-label,.entry-detail,.entry-day-name,.today-label{color:#555!important;}
+    .entry-type{color:#000!important;}
+    .pdf-header{display:block!important;}
+    .section-title{color:#555!important;}
+    .stats-grid{margin-bottom:20px!important;}
+  }
+  .pdf-header{display:none;text-align:center;padding:20px 0 10px;border-bottom:2px solid #eee;margin-bottom:20px;}
+  .pdf-header h1{font-size:24px;font-weight:700;color:#000;}
+  .pdf-header p{font-size:14px;color:#555;margin-top:4px;}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-inner">
+    <div>
+      <div class="header-title" id="headerTitle">Zeiterfassung</div>
+      <div class="header-date" id="headerDate"></div>
+    </div>
+    <div class="month-nav">
+      <button class="nav-btn" onclick="changeMonth(-1)">‹</button>
+      <button class="nav-btn" onclick="changeMonth(1)">›</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="scroll-content">
+
+  <!-- PAGE: HEUTE -->
+  <div class="page active" id="page-heute">
+    <div class="today-card">
+      <div class="today-label">⏱ Heute</div>
+      <div class="clock-display" id="clockDisplay">00:00:00</div>
+      <div class="today-weekday" id="todayWeekday"></div>
+      <div class="time-buttons">
+        <button class="time-btn btn-kommen" onclick="stempelKommen()"><span class="btn-icon">🟢</span> Kommen</button>
+        <button class="time-btn btn-gehen" onclick="stempelGehen()"><span class="btn-icon">🔴</span> Gehen</button>
+        <button class="time-btn btn-pause-start" onclick="pauseStart()"><span class="btn-icon">☕</span> Pause</button>
+        <button class="time-btn btn-pause-end" onclick="pauseEnd()"><span class="btn-icon">▶️</span> Weiter</button>
+      </div>
+      <div class="status-row">
+        <div class="status-chip"><div class="chip-label">Kommen</div><div class="chip-value" id="statusKommen" style="color:var(--green)">--:--</div></div>
+        <div class="status-chip"><div class="chip-label">Gehen</div><div class="chip-value" id="statusGehen" style="color:var(--red)">--:--</div></div>
+        <div class="status-chip"><div class="chip-label">Pause</div><div class="chip-value" id="statusPause" style="color:var(--orange)">00:00</div></div>
+      </div>
+    </div>
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-icon">⚡</div><div class="stat-label">Heute</div>
+        <div class="stat-value" id="statHeute">0:00</div>
+        <div class="stat-sub">von <span id="sollHeuteH">8:00</span>h</div>
+        <div class="progress-wrap"><div class="progress-bar" id="progressHeute" style="width:0%;background:var(--green)"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📅</div><div class="stat-label">Diese Woche</div>
+        <div class="stat-value" id="statWoche">0:00</div>
+        <div class="stat-sub">von <span id="sollWocheH">40:00</span>h</div>
+        <div class="progress-wrap"><div class="progress-bar" id="progressWoche" style="width:0%;background:var(--blue)"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">📊</div><div class="stat-label">Monat</div>
+        <div class="stat-value" id="statMonat">0:00</div>
+        <div class="stat-sub">IST Stunden</div>
+        <div class="progress-wrap"><div class="progress-bar" id="progressMonat" style="width:0%;background:var(--purple)"></div></div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">⏰</div><div class="stat-label">Überstunden</div>
+        <div class="stat-value ueber-positive" id="statUeber">0:00</div>
+        <div class="stat-sub">gesamt</div>
+      </div>
+    </div>
+    <div class="section-header"><div class="section-title">Heute eintragen</div></div>
+    <div class="special-days">
+      <div class="special-btn" id="btnUrlaub" onclick="toggleSonderTag('urlaub')"><span class="special-emoji">🏖️</span><span class="special-label">Urlaub</span><span class="special-count" id="cntUrlaub" style="color:var(--blue)">0 Tage</span></div>
+      <div class="special-btn" id="btnKrank" onclick="toggleSonderTag('krank')"><span class="special-emoji">🤒</span><span class="special-label">Krank</span><span class="special-count" id="cntKrank" style="color:var(--red)">0 Tage</span></div>
+      <div class="special-btn" id="btnFeiertag" onclick="toggleSonderTag('feiertag')"><span class="special-emoji">🎉</span><span class="special-label">Feiertag</span><span class="special-count" id="cntFeiertag" style="color:var(--purple)">0 Tage</span></div>
+    </div>
+    <div class="section-header"><div class="section-title">Woche</div></div>
+    <div class="today-card" style="padding:16px"><div class="chart-bars" id="weekChart"></div></div>
+  </div>
+
+  <!-- PAGE: EINTRÄGE -->
+  <div class="page" id="page-eintraege">
+    <div class="pdf-header" id="pdfHeader">
+      <h1>📋 Zeiterfassung</h1>
+      <p id="pdfSubtitle"></p>
+    </div>
+    <div class="section-header">
+      <div class="section-title">Alle Einträge</div>
+      <button class="section-add" onclick="openAddModal()">+</button>
+    </div>
+    <button class="export-btn" onclick="exportPDF()">📄 Als PDF exportieren</button>
+    <div class="entries-list" id="entriesList">
+      <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Noch keine Einträge</div></div>
+    </div>
+  </div>
+
+  <!-- PAGE: SOLLZEIT -->
+  <div class="page" id="page-soll">
+    <div class="section-header"><div class="section-title">Arbeitszeitmodell</div></div>
+    <div class="soll-card">
+      <div class="soll-header"><div class="soll-title">Wochenplan</div><button class="soll-edit-btn" onclick="openSollModal()">Bearbeiten</button></div>
+      <div class="soll-days" id="sollDaysDisplay"></div>
+      <div class="soll-total"><span class="soll-total-label">Wochenstunden gesamt</span><span class="soll-total-value" id="sollTotal">0:00 h</span></div>
+    </div>
+    <div class="section-header"><div class="section-title">Jahresübersicht</div></div>
+    <div class="stats-grid">
+      <div class="stat-card"><div class="stat-icon">🏖️</div><div class="stat-label">Urlaub</div><div class="stat-value" id="jahrUrlaub" style="color:var(--blue)">0</div><div class="stat-sub">von <span id="urlaubAnspruch">30</span> Tagen</div><div class="progress-wrap"><div class="progress-bar" id="progressUrlaub" style="width:0%;background:var(--blue)"></div></div></div>
+      <div class="stat-card"><div class="stat-icon">🤒</div><div class="stat-label">Krankentage</div><div class="stat-value" id="jahrKrank" style="color:var(--red)">0</div><div class="stat-sub">dieses Jahr</div></div>
+      <div class="stat-card"><div class="stat-icon">🎉</div><div class="stat-label">Feiertage</div><div class="stat-value" id="jahrFeiertag" style="color:var(--purple)">0</div><div class="stat-sub">dieses Jahr</div></div>
+      <div class="stat-card"><div class="stat-icon">⏰</div><div class="stat-label">Überstunden</div><div class="stat-value" id="jahrUeber">0:00</div><div class="stat-sub">Saldo</div></div>
+    </div>
+    <div class="section-header"><div class="section-title">Einstellungen</div></div>
+    <div class="settings-section">
+      <div class="settings-row" onclick="editUrlaubAnspruch()">
+        <div class="settings-row-left"><div class="settings-icon" style="background:var(--blue-dim)">🏖️</div><div><div class="settings-text-label">Urlaubsanspruch</div><div class="settings-text-sub">Tage pro Jahr</div></div></div>
+        <div class="settings-value" id="urlaubAnspruchValue">30 Tage</div>
+      </div>
+      <div class="settings-row" onclick="editPauseSettings()">
+        <div class="settings-row-left"><div class="settings-icon" style="background:var(--orange-dim)">☕</div><div><div class="settings-text-label">Pausenregelung</div><div class="settings-text-sub">Auto-Abzug</div></div></div>
+        <div class="settings-value" id="pauseAutoValue">30 min</div>
+      </div>
+      <div class="settings-row">
+        <div class="settings-row-left"><div class="settings-icon" style="background:var(--green-dim)">🔔</div><div><div class="settings-text-label">Erinnerungen</div><div class="settings-text-sub">Stempel-Reminder</div></div></div>
+        <div class="toggle" id="reminderToggle" onclick="this.classList.toggle('on')"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAGE: ÜBERSICHT -->
+  <div class="page" id="page-uebersicht">
+    <div class="section-header"><div class="section-title">Monatsübersicht</div></div>
+    <div class="stats-grid">
+      <div class="stat-card full-width">
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <div><div class="stat-icon">📊</div><div class="stat-label">Saldo</div><div class="stat-value" id="saldoValue">0:00</div></div>
+          <div style="text-align:right"><div class="stat-label">IST</div><div class="stat-value" id="istValue" style="color:var(--green)">0:00</div><div class="stat-label" style="margin-top:8px">SOLL</div><div class="stat-value" id="sollValue" style="color:var(--blue)">0:00</div></div>
+        </div>
+        <div class="progress-wrap" style="margin-top:16px"><div class="progress-bar" id="progressSaldo" style="width:0%;background:var(--green)"></div></div>
+      </div>
+      <div class="stat-card"><div class="stat-icon">📅</div><div class="stat-label">Arbeitstage</div><div class="stat-value" id="arbeitstageValue">0</div><div class="stat-sub">im Monat</div></div>
+      <div class="stat-card"><div class="stat-icon">⌀</div><div class="stat-label">Ø täglich</div><div class="stat-value" id="avgValue">0:00</div><div class="stat-sub">Stunden</div></div>
+    </div>
+    <div class="section-header"><div class="section-title">Einträge diesen Monat</div><button class="section-add" onclick="openAddModal()">+</button></div>
+    <div class="entries-list" id="monthEntriesList">
+      <div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Noch keine Einträge</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- BOTTOM NAV -->
+<div class="bottom-nav">
+  <div class="nav-item active" onclick="switchPage('heute',this)"><span class="nav-emoji">⏱</span><span class="nav-label">Heute</span></div>
+  <div class="nav-item" onclick="switchPage('eintraege',this)"><span class="nav-emoji">📋</span><span class="nav-label">Einträge</span></div>
+  <div class="nav-item" onclick="switchPage('soll',this)"><span class="nav-emoji">⚙️</span><span class="nav-label">Sollzeit</span></div>
+  <div class="nav-item" onclick="switchPage('uebersicht',this)"><span class="nav-emoji">📊</span><span class="nav-label">Übersicht</span></div>
+</div>
+
+<!-- ADD / EDIT ENTRY MODAL -->
+<div class="modal-overlay" id="addModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="addModalTitle">Eintrag hinzufügen</div>
+    <input type="hidden" id="editEntryId" value="">
+    <div class="form-group">
+      <div class="form-label">Typ</div>
+      <select class="form-select" id="addType" onchange="onTypeChange()">
+        <option value="arbeit">💼 Arbeit</option>
+        <option value="urlaub">🏖️ Urlaub</option>
+        <option value="krank">🤒 Krank</option>
+        <option value="feiertag">🎉 Feiertag</option>
+      </select>
+    </div>
+    <div class="form-group">
+      <div class="form-label">Datum</div>
+      <input class="form-input" type="date" id="addDate">
+    </div>
+    <div id="arbeitFields">
+      <div class="form-row">
+        <div class="form-group"><div class="form-label">Kommen</div><input class="form-input" type="time" id="addKommen" value="08:00"></div>
+        <div class="form-group"><div class="form-label">Gehen</div><input class="form-input" type="time" id="addGehen" value="17:00"></div>
+      </div>
+      <div class="form-group">
+        <div class="form-label">Pause (Minuten)</div>
+        <input class="form-input" type="number" id="addPause" value="30" min="0" max="240">
+      </div>
+    </div>
+    <div class="form-group" id="notizField">
+      <div class="form-label">Notiz (optional)</div>
+      <input class="form-input" type="text" id="addNotiz" placeholder="z.B. Homeoffice, Meeting...">
+    </div>
+    <button class="modal-btn primary" onclick="saveEntry()">Speichern</button>
+    <button class="modal-btn secondary" onclick="closeModal('addModal')">Abbrechen</button>
+  </div>
+</div>
+
+<!-- SOLL MODAL -->
+<div class="modal-overlay" id="sollModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Sollzeit bearbeiten</div>
+    <div id="sollEditFields"></div>
+    <button class="modal-btn primary" onclick="saveSoll()">Speichern</button>
+    <button class="modal-btn secondary" onclick="closeModal('sollModal')">Abbrechen</button>
+  </div>
+</div>
+
+<!-- URLAUB MODAL -->
+<div class="modal-overlay" id="urlaubModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Urlaubsanspruch</div>
+    <div class="form-group"><div class="form-label">Urlaubstage pro Jahr</div><input class="form-input" type="number" id="urlaubInput" min="0" max="365" value="30"></div>
+    <button class="modal-btn primary" onclick="saveUrlaub()">Speichern</button>
+    <button class="modal-btn secondary" onclick="closeModal('urlaubModal')">Abbrechen</button>
+  </div>
+</div>
+
+<!-- PAUSE MODAL -->
+<div class="modal-overlay" id="pauseModal">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Pausenregelung</div>
+    <div class="form-group"><div class="form-label">Auto-Pausen-Abzug (Minuten)</div><input class="form-input" type="number" id="pauseInput" min="0" max="120" value="30"></div>
+    <button class="modal-btn primary" onclick="savePauseSettings()">Speichern</button>
+    <button class="modal-btn secondary" onclick="closeModal('pauseModal')">Abbrechen</button>
+  </div>
+</div>
+
+<script>
+// ===== STATE =====
+let state = JSON.parse(localStorage.getItem('zeiterfassung') || 'null') || {
+  entries: [],
+  today: { kommen:null, gehen:null, pauseStart:null, pauseTotal:0, isPaused:false, date:null },
+  soll: { Mo:8, Di:8, Mi:8, Do:8, Fr:8, Sa:0, So:0 },
+  urlaubAnspruch: 30,
+  pauseAuto: 30,
+  currentMonth: 5,
+  currentYear: 2025
+};
+
+const DAYS = ['Mo','Di','Mi','Do','Fr','Sa','So'];
+const MONTHS = ['Januar','Februar','März','April','Mai','Juni','Juli','August','September','Oktober','November','Dezember'];
+const WEEKDAYS = ['Sonntag','Montag','Dienstag','Mittwoch','Donnerstag','Freitag','Samstag'];
+
+function save() { localStorage.setItem('zeiterfassung', JSON.stringify(state)); }
+
+// ===== CLOCK =====
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clockDisplay').textContent =
+    String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0')+':'+String(now.getSeconds()).padStart(2,'0');
+  const todayStr = now.toDateString();
+  if (state.today.date !== todayStr && state.today.kommen) {
+    state.today = { kommen:null, gehen:null, pauseStart:null, pauseTotal:0, isPaused:false, date:todayStr };
+    save();
+  }
+  if (!state.today.date) state.today.date = todayStr;
+  if (state.today.kommen && !state.today.gehen) {
+    const elapsed = (now - new Date(state.today.kommen)) / 60000 -
+      (state.today.pauseTotal + (state.today.isPaused && state.today.pauseStart ? (now - new Date(state.today.pauseStart))/60000 : 0));
+    document.getElementById('statHeute').textContent = formatMinutes(Math.max(0, elapsed));
+    const soll = getSollMinutes(now);
+    document.getElementById('progressHeute').style.width = Math.min(100, soll>0 ? (Math.max(0,elapsed)/soll*100) : 0)+'%';
+  }
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ===== STEMPEL =====
+function stempelKommen() {
+  if (state.today.kommen) { showToast('⚠️ Bereits gestempelt!'); return; }
+  state.today.kommen = new Date().toISOString();
+  state.today.date = new Date().toDateString();
+  document.getElementById('statusKommen').textContent = formatTime(new Date());
+  save(); showToast('🟢 Kommen gestempelt!'); updateStats();
+}
+function stempelGehen() {
+  if (!state.today.kommen) { showToast('⚠️ Bitte erst Kommen stempeln!'); return; }
+  if (state.today.gehen) { showToast('⚠️ Bereits ausgestempelt!'); return; }
+  if (state.today.isPaused) pauseEnd();
+  state.today.gehen = new Date().toISOString();
+  document.getElementById('statusGehen').textContent = formatTime(new Date());
+  const kommen = new Date(state.today.kommen), gehen = new Date(state.today.gehen);
+  const totalMin = (gehen - kommen)/60000 - state.today.pauseTotal;
+  const today = new Date();
+  state.entries.push({ id:Date.now(), type:'arbeit', date:today.toISOString().split('T')[0],
+    kommen:state.today.kommen, gehen:state.today.gehen,
+    pauseMin:Math.round(state.today.pauseTotal), totalMin:Math.round(Math.max(0,totalMin)) });
+  save(); showToast('🔴 Gehen gestempelt!'); updateStats(); renderEntries();
+}
+function pauseStart() {
+  if (!state.today.kommen) { showToast('⚠️ Nicht eingestempelt!'); return; }
+  if (state.today.isPaused) { showToast('⚠️ Pause läuft bereits!'); return; }
+  state.today.isPaused = true;
+  state.today.pauseStart = new Date().toISOString();
+  save(); showToast('☕ Pause gestartet');
+}
+function pauseEnd() {
+  if (!state.today.isPaused) { showToast('⚠️ Keine aktive Pause!'); return; }
+  const elapsed = (new Date() - new Date(state.today.pauseStart))/60000;
+  state.today.pauseTotal += elapsed;
+  state.today.isPaused = false;
+  state.today.pauseStart = null;
+  document.getElementById('statusPause').textContent = formatMinutes(state.today.pauseTotal);
+  save(); showToast('▶️ Weiter geht\'s!');
+}
+
+// ===== SONDER-TAGE =====
+function toggleSonderTag(type) {
+  const today = new Date().toISOString().split('T')[0];
+  const existing = state.entries.find(e => e.date === today && e.type === type);
+  if (existing) {
+    state.entries = state.entries.filter(e => !(e.date === today && e.type === type));
+    showToast('Eintrag entfernt');
+  } else {
+    state.entries = state.entries.filter(e => !(e.date === today && ['urlaub','krank','feiertag'].includes(e.type)));
+    state.entries.push({ id:Date.now(), type, date:today, totalMin:getSollMinutes(new Date()) });
+    showToast(type==='urlaub'?'🏖️ Urlaub eingetragen!':type==='krank'?'🤒 Krank eingetragen!':'🎉 Feiertag eingetragen!');
+  }
+  save(); updateStats(); renderEntries();
+}
+
+// ===== STATS =====
+function getSollMinutes(date) {
+  const dayNames = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  return (state.soll[dayNames[date.getDay()]]||0)*60;
+}
+function updateStats() {
+  const now = new Date();
+  const todayStr = now.toISOString().split('T')[0];
+  const sollHeuteMin = getSollMinutes(now);
+  document.getElementById('sollHeuteH').textContent = formatMinutes(sollHeuteMin);
+  const year = now.getFullYear(), yearStr = year.toString();
+  const urlaubDays = state.entries.filter(e=>e.type==='urlaub'&&e.date.startsWith(yearStr)).length;
+  const krankDays = state.entries.filter(e=>e.type==='krank'&&e.date.startsWith(yearStr)).length;
+  const feiertagDays = state.entries.filter(e=>e.type==='feiertag'&&e.date.startsWith(yearStr)).length;
+  document.getElementById('cntUrlaub').textContent = urlaubDays+' Tage';
+  document.getElementById('cntKrank').textContent = krankDays+' Tage';
+  document.getElementById('cntFeiertag').textContent = feiertagDays+' Tage';
+  const todayUrlaub = state.entries.find(e=>e.date===todayStr&&e.type==='urlaub');
+  const todayKrank = state.entries.find(e=>e.date===todayStr&&e.type==='krank');
+  const todayFeiertag = state.entries.find(e=>e.date===todayStr&&e.type==='feiertag');
+  document.getElementById('btnUrlaub').className = 'special-btn'+(todayUrlaub?' active-urlaub':'');
+  document.getElementById('btnKrank').className = 'special-btn'+(todayKrank?' active-krank':'');
+  document.getElementById('btnFeiertag').className = 'special-btn'+(todayFeiertag?' active-feiertag':'');
+  // Week
+  const monday = new Date(now); monday.setDate(now.getDate()-(now.getDay()===0?6:now.getDay()-1)); monday.setHours(0,0,0,0);
+  const sunday = new Date(monday); sunday.setDate(monday.getDate()+6); sunday.setHours(23,59,59);
+  let wocheIst=0, wocheSoll=0;
+  for (let d=new Date(monday); d<=sunday; d.setDate(d.getDate()+1)) {
+    const ds=d.toISOString().split('T')[0];
+    state.entries.filter(e=>e.date===ds).forEach(e=>{wocheIst+=e.totalMin||0;});
+    wocheSoll+=getSollMinutes(new Date(d));
+  }
+  document.getElementById('statWoche').textContent = formatMinutes(wocheIst);
+  document.getElementById('sollWocheH').textContent = formatMinutes(wocheSoll);
+  document.getElementById('progressWoche').style.width = Math.min(100,wocheSoll>0?(wocheIst/wocheSoll*100):0)+'%';
+  // Month
+  const cm=state.currentMonth, cy=state.currentYear;
+  const monthEntries = state.entries.filter(e=>{const d=new Date(e.date);return d.getMonth()===cm&&d.getFullYear()===cy;});
+  const monatIst = monthEntries.reduce((s,e)=>s+(e.totalMin||0),0);
+  let monatSoll=0;
+  const daysInMonth = new Date(cy,cm+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++) monatSoll+=getSollMinutes(new Date(cy,cm,d));
+  document.getElementById('statMonat').textContent = formatMinutes(monatIst);
+  document.getElementById('progressMonat').style.width = Math.min(100,monatSoll>0?(monatIst/monatSoll*100):0)+'%';
+  const ueber=monatIst-monatSoll;
+  const ueberEl=document.getElementById('statUeber');
+  ueberEl.textContent=(ueber>=0?'+':'-')+formatMinutes(Math.abs(ueber));
+  ueberEl.style.color=ueber>=0?'var(--green)':'var(--red)';
+  // Übersicht
+  document.getElementById('istValue').textContent=formatMinutes(monatIst);
+  document.getElementById('sollValue').textContent=formatMinutes(monatSoll);
+  const saldoEl=document.getElementById('saldoValue');
+  saldoEl.textContent=(ueber>=0?'+':'-')+formatMinutes(Math.abs(ueber));
+  saldoEl.style.color=ueber>=0?'var(--green)':'var(--red)';
+  document.getElementById('progressSaldo').style.width=Math.min(100,monatSoll>0?(monatIst/monatSoll*100):0)+'%';
+  const arbeitstage=monthEntries.filter(e=>e.type==='arbeit').length;
+  document.getElementById('arbeitstageValue').textContent=arbeitstage;
+  document.getElementById('avgValue').textContent=arbeitstage>0?formatMinutes(monatIst/arbeitstage):'0:00';
+  // Jahresübersicht
+  document.getElementById('jahrUrlaub').textContent=urlaubDays;
+  document.getElementById('jahrKrank').textContent=krankDays;
+  document.getElementById('jahrFeiertag').textContent=feiertagDays;
+  document.getElementById('urlaubAnspruch').textContent=state.urlaubAnspruch;
+  document.getElementById('progressUrlaub').style.width=Math.min(100,state.urlaubAnspruch>0?(urlaubDays/state.urlaubAnspruch*100):0)+'%';
+  const jahrIst=state.entries.filter(e=>e.date.startsWith(yearStr)).reduce((s,e)=>s+(e.totalMin||0),0);
+  let jahrSoll=0;
+  for(let m=0;m<12;m++){const days=new Date(year,m+1,0).getDate();for(let d=1;d<=days;d++)jahrSoll+=getSollMinutes(new Date(year,m,d));}
+  const jahrSaldo=jahrIst-jahrSoll;
+  const juEl=document.getElementById('jahrUeber');
+  juEl.textContent=(jahrSaldo>=0?'+':'-')+formatMinutes(Math.abs(jahrSaldo));
+  juEl.style.color=jahrSaldo>=0?'var(--green)':'var(--red)';
+  renderWeekChart(monday);
+  if(state.today.kommen) document.getElementById('statusKommen').textContent=formatTime(new Date(state.today.kommen));
+  if(state.today.gehen) document.getElementById('statusGehen').textContent=formatTime(new Date(state.today.gehen));
+  document.getElementById('statusPause').textContent=formatMinutes(state.today.pauseTotal);
+  updateHeaderDate();
+}
+
+function renderWeekChart(monday) {
+  const wrap=document.getElementById('weekChart'); wrap.innerHTML='';
+  let maxH=0; const days=[];
+  for(let i=0;i<7;i++){
+    const d=new Date(monday); d.setDate(monday.getDate()+i);
+    const ds=d.toISOString().split('T')[0];
+    const total=state.entries.filter(e=>e.date===ds).reduce((s,e)=>s+(e.totalMin||0),0);
+    const soll=getSollMinutes(d);
+    days.push({label:DAYS[i],total,soll});
+    if(total>maxH)maxH=total;
+  }
+  if(maxH===0)maxH=getSollMinutes(new Date())||480;
+  days.forEach(d=>{
+    const pct=Math.min(100,(d.total/maxH)*100);
+    const color=d.total>=d.soll?'var(--green)':d.total>0?'var(--orange)':'var(--surface3)';
+    const w=document.createElement('div'); w.className='chart-bar-wrap';
+    w.innerHTML=`<div class="chart-bar" style="height:${pct}%;background:${color}"></div><div class="chart-bar-label">${d.label}</div>`;
+    wrap.appendChild(w);
+  });
+}
+
+// ===== ENTRIES =====
+function renderEntries() {
+  const allList=document.getElementById('entriesList');
+  const monthList=document.getElementById('monthEntriesList');
+  const cm=state.currentMonth, cy=state.currentYear;
+  const allSorted=[...state.entries].sort((a,b)=>b.date.localeCompare(a.date));
+  const monthFiltered=allSorted.filter(e=>{const d=new Date(e.date);return d.getMonth()===cm&&d.getFullYear()===cy;});
+  allList.innerHTML=allSorted.length===0?'<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Noch keine Einträge</div></div>':'';
+  allSorted.forEach(e=>allList.appendChild(createEntryEl(e)));
+  monthList.innerHTML=monthFiltered.length===0?'<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-text">Keine Einträge diesen Monat</div></div>':'';
+  monthFiltered.forEach(e=>monthList.appendChild(createEntryEl(e)));
+}
+
+function createEntryEl(e) {
+  const d=new Date(e.date);
+  const dayNum=d.getDate();
+  const dayName=['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()];
+  const typeLabels={arbeit:'💼 Arbeit',urlaub:'🏖️ Urlaub',krank:'🤒 Krank',feiertag:'🎉 Feiertag'};
+  const typeColors={arbeit:'var(--green)',urlaub:'var(--blue)',krank:'var(--red)',feiertag:'var(--purple)'};
+  let detail='';
+  if(e.type==='arbeit'){
+    const kom=e.kommen?formatTime(new Date(e.kommen)):'--:--';
+    const geh=e.gehen?formatTime(new Date(e.gehen)):'--:--';
+    detail=`${kom}–${geh} | Pause: ${e.pauseMin||0}min | ${formatMinutes(e.totalMin||0)}h`;
+    if(e.notiz) detail+=` | ${e.notiz}`;
+  } else if(e.notiz) { detail=e.notiz; }
+  const el=document.createElement('div');
+  el.className=`entry-item type-${e.type}`;
+  el.innerHTML=`
+    <div class="entry-date-col">
+      <div class="entry-day-num" style="color:${typeColors[e.type]}">${dayNum}</div>
+      <div class="entry-day-name">${dayName}</div>
+    </div>
+    <div class="entry-info">
+      <div class="entry-type">${typeLabels[e.type]||e.type}</div>
+      <div class="entry-detail">${detail}</div>
+    </div>
+    <div class="entry-actions">
+      <button class="entry-btn entry-edit" onclick="openEditModal(${e.id})">✏️</button>
+      <button class="entry-btn entry-delete" onclick="deleteEntry(${e.id})">✕</button>
+    </div>`;
+  return el;
+}
+
+function deleteEntry(id) {
+  if(!confirm('Eintrag löschen?')) return;
+  state.entries=state.entries.filter(e=>e.id!==id);
+  save(); updateStats(); renderEntries(); showToast('🗑️ Eintrag gelöscht');
+}
+
+// ===== EDIT ENTRY =====
+function openEditModal(id) {
+  const entry = state.entries.find(e=>e.id===id);
+  if(!entry) return;
+  document.getElementById('addModalTitle').textContent = 'Eintrag bearbeiten';
+  document.getElementById('editEntryId').value = id;
+  document.getElementById('addType').value = entry.type;
+  document.getElementById('addDate').value = entry.date;
+  document.getElementById('addNotiz').value = entry.notiz||'';
+  onTypeChange();
+  if(entry.type==='arbeit') {
+    if(entry.kommen) document.getElementById('addKommen').value = formatTime(new Date(entry.kommen));
+    if(entry.gehen) document.getElementById('addGehen').value = formatTime(new Date(entry.gehen));
+    document.getElementById('addPause').value = entry.pauseMin||0;
+  }
+  document.getElementById('addModal').classList.add('open');
+}
+
+function openAddModal() {
+  document.getElementById('addModalTitle').textContent = 'Eintrag hinzufügen';
+  document.getElementById('editEntryId').value = '';
+  document.getElementById('addDate').value = new Date().toISOString().split('T')[0];
+  document.getElementById('addType').value = 'arbeit';
+  document.getElementById('addKommen').value = '08:00';
+  document.getElementById('addGehen').value = '17:00';
+  document.getElementById('addPause').value = 30;
+  document.getElementById('addNotiz').value = '';
+  onTypeChange();
+  document.getElementById('addModal').classList.add('open');
+}
+
+function onTypeChange() {
+  const type=document.getElementById('addType').value;
+  document.getElementById('arbeitFields').style.display=type==='arbeit'?'block':'none';
+}
+
+function saveEntry() {
+  const type=document.getElementById('addType').value;
+  const date=document.getElementById('addDate').value;
+  const notiz=document.getElementById('addNotiz').value.trim();
+  if(!date){showToast('⚠️ Datum wählen!');return;}
+  const editId=document.getElementById('editEntryId').value;
+
+  let entry={type,date,notiz};
+  if(editId) {
+    entry.id=parseInt(editId);
+  } else {
+    entry.id=Date.now();
+  }
+
+  if(type==='arbeit'){
+    const kommen=document.getElementById('addKommen').value;
+    const gehen=document.getElementById('addGehen').value;
+    const pauseMin=parseInt(document.getElementById('addPause').value)||0;
+    const [kh,km]=kommen.split(':').map(Number);
+    const [gh,gm]=gehen.split(':').map(Number);
+    const totalMin=(gh*60+gm)-(kh*60+km)-pauseMin;
+    const dateObj=new Date(date);
+    entry.kommen=new Date(dateObj.getFullYear(),dateObj.getMonth(),dateObj.getDate(),kh,km).toISOString();
+    entry.gehen=new Date(dateObj.getFullYear(),dateObj.getMonth(),dateObj.getDate(),gh,gm).toISOString();
+    entry.pauseMin=pauseMin;
+    entry.totalMin=Math.max(0,totalMin);
+  } else {
+    entry.totalMin=getSollMinutes(new Date(date));
+  }
+
+  if(editId) {
+    const idx=state.entries.findIndex(e=>e.id===parseInt(editId));
+    if(idx>=0) state.entries[idx]=entry;
+  } else {
+    state.entries.push(entry);
+  }
+
+  save(); updateStats(); renderEntries(); closeModal('addModal');
+  showToast(editId?'✅ Eintrag aktualisiert!':'✅ Eintrag gespeichert!');
+}
+
+// ===== SOLL =====
+function renderSollDisplay() {
+  const wrap=document.getElementById('sollDaysDisplay'); wrap.innerHTML='';
+  const todayDow=['So','Mo','Di','Mi','Do','Fr','Sa'][new Date().getDay()];
+  DAYS.slice(0,5).forEach(d=>{
+    const el=document.createElement('div');
+    el.className='soll-day'+(d===todayDow?' active-day':'');
+    el.innerHTML=`<div class="day-name">${d}</div><div class="day-hours">${state.soll[d]}h</div>`;
+    wrap.appendChild(el);
+  });
+  const total=Object.values(state.soll).reduce((s,v)=>s+v,0);
+  document.getElementById('sollTotal').textContent=total+':00 h';
+}
+function openSollModal() {
+  const container=document.getElementById('sollEditFields'); container.innerHTML='';
+  DAYS.slice(0,5).forEach(d=>{
+    container.innerHTML+=`<div class="form-group"><div class="form-label">${d}</div><input class="form-input" type="number" id="soll_${d}" value="${state.soll[d]}" min="0" max="24" step="0.5"></div>`;
+  });
+  document.getElementById('sollModal').classList.add('open');
+}
+function saveSoll() {
+  DAYS.slice(0,5).forEach(d=>{state.soll[d]=parseFloat(document.getElementById('soll_'+d).value)||0;});
+  save(); renderSollDisplay(); updateStats(); closeModal('sollModal'); showToast('✅ Sollzeit gespeichert!');
+}
+
+// ===== SETTINGS =====
+function editUrlaubAnspruch() {
+  document.getElementById('urlaubInput').value=state.urlaubAnspruch;
+  document.getElementById('urlaubModal').classList.add('open');
+}
+function saveUrlaub() {
+  state.urlaubAnspruch=parseInt(document.getElementById('urlaubInput').value)||30;
+  document.getElementById('urlaubAnspruchValue').textContent=state.urlaubAnspruch+' Tage';
+  save(); updateStats(); closeModal('urlaubModal'); showToast('✅ Urlaubsanspruch gespeichert!');
+}
+function editPauseSettings() {
+  document.getElementById('pauseInput').value=state.pauseAuto;
+  document.getElementById('pauseModal').classList.add('open');
+}
+function savePauseSettings() {
+  state.pauseAuto=parseInt(document.getElementById('pauseInput').value)||30;
+  document.getElementById('pauseAutoValue').textContent=state.pauseAuto+' min';
+  save(); closeModal('pauseModal'); showToast('✅ Pausenregelung gespeichert!');
+}
+
+// ===== PDF EXPORT =====
+function exportPDF() {
+  const cm=state.currentMonth, cy=state.currentYear;
+  const monthEntries=[...state.entries].filter(e=>{
+    const d=new Date(e.date);
+    return d.getMonth()===cm&&d.getFullYear()===cy;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const monatIst=monthEntries.reduce((s,e)=>s+(e.totalMin||0),0);
+  let monatSoll=0;
+  const daysInMonth=new Date(cy,cm+1,0).getDate();
+  for(let d=1;d<=daysInMonth;d++) monatSoll+=getSollMinutes(new Date(cy,cm,d));
+  const saldo=monatIst-monatSoll;
+
+  const typeLabels={arbeit:'Arbeit',urlaub:'Urlaub',krank:'Krank',feiertag:'Feiertag'};
+  const typeEmoji={arbeit:'💼',urlaub:'🏖️',krank:'🤒',feiertag:'🎉'};
+
+  let rows='';
+  monthEntries.forEach(e=>{
+    const d=new Date(e.date);
+    const dayName=['So','Mo','Di','Mi','Do','Fr','Sa'][d.getDay()];
+    const dateStr=`${dayName}, ${d.getDate().toString().padStart(2,'0')}.${(d.getMonth()+1).toString().padStart(2,'0')}.${d.getFullYear()}`;
+    let detail='–';
+    if(e.type==='arbeit'){
+      const kom=e.kommen?formatTime(new Date(e.kommen)):'–';
+      const geh=e.gehen?formatTime(new Date(e.gehen)):'–';
+      detail=`${kom} – ${geh}`;
+    }
+    const pause=e.type==='arbeit'?(e.pauseMin||0)+' min':'–';
+    const hours=formatMinutes(e.totalMin||0)+' h';
+    const notiz=e.notiz||'–';
+    rows+=`<tr>
+      <td>${dateStr}</td>
+      <td>${typeEmoji[e.type]||''} ${typeLabels[e.type]||e.type}</td>
+      <td>${detail}</td>
+      <td>${pause}</td>
+      <td style="font-weight:600">${hours}</td>
+      <td>${notiz}</td>
+    </tr>`;
+  });
+
+  if(monthEntries.length===0) rows='<tr><td colspan="6" style="text-align:center;color:#888;padding:20px">Keine Einträge</td></tr>';
+
+  const saldoColor=saldo>=0?'#00b874':'#e11d48';
+  const saldoText=(saldo>=0?'+':'')+formatMinutes(Math.abs(saldo))+' h';
+
+  const html=`<!DOCTYPE html><html lang="de"><head><meta charset="UTF-8">
+  <title>Zeiterfassung ${MONTHS[cm]} ${cy}</title>
+  <style>
+    body{font-family:Arial,sans-serif;margin:0;padding:30px;color:#111;font-size:13px;}
+    h1{font-size:22px;margin:0;color:#111;}
+    .subtitle{color:#666;margin:4px 0 24px;font-size:14px;}
+    .summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px;}
+    .sum-box{border:1px solid #e5e7eb;border-radius:8px;padding:12px 16px;}
+    .sum-label{font-size:11px;color:#888;text-transform:uppercase;letter-spacing:0.5px;}
+    .sum-value{font-size:20px;font-weight:700;margin-top:4px;}
+    table{width:100%;border-collapse:collapse;}
+    th{background:#f3f4f6;text-align:left;padding:10px 12px;font-size:11px;text-transform:uppercase;letter-spacing:0.5px;color:#555;border-bottom:2px solid #e5e7eb;}
+    td{padding:9px 12px;border-bottom:1px solid #f3f4f6;vertical-align:middle;}
+    tr:nth-child(even){background:#fafafa;}
+    tr:hover{background:#f0fdf4;}
+    .type-arbeit td:first-child{border-left:3px solid #00b874;}
+    .type-urlaub td:first-child{border-left:3px solid #2563eb;}
+    .type-krank td:first-child{border-left:3px solid #e11d48;}
+    .type-feiertag td:first-child{border-left:3px solid #7c3aed;}
+    .footer{margin-top:24px;padding-top:14px;border-top:1px solid #e5e7eb;color:#888;font-size:11px;text-align:center;}
+    @media print{body{padding:15px;}}
+  </style></head><body>
+  <h1>📋 Zeiterfassung</h1>
+  <div class="subtitle">${MONTHS[cm]} ${cy} · Exportiert am ${new Date().toLocaleDateString('de-DE')}</div>
+  <div class="summary">
+    <div class="sum-box"><div class="sum-label">IST-Stunden</div><div class="sum-value" style="color:#00b874">${formatMinutes(monatIst)} h</div></div>
+    <div class="sum-box"><div class="sum-label">SOLL-Stunden</div><div class="sum-value" style="color:#2563eb">${formatMinutes(monatSoll)} h</div></div>
+    <div class="sum-box"><div class="sum-label">Saldo</div><div class="sum-value" style="color:${saldoColor}">${saldoText}</div></div>
+    <div class="sum-box"><div class="sum-label">Einträge</div><div class="sum-value">${monthEntries.length}</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Datum</th><th>Typ</th><th>Kommen – Gehen</th><th>Pause</th><th>Stunden</th><th>Notiz</th></tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  <div class="footer">Zeiterfassung App · ${MONTHS[cm]} ${cy}</div>
+  <script>window.onload=()=>{window.print();}<\/script>
+  </body></html>`;
+
+  const blob=new Blob([html],{type:'text/html'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`Zeiterfassung_${MONTHS[cm]}_${cy}.html`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📄 PDF wird vorbereitet...');
+}
+
+// ===== NAVIGATION =====
+function switchPage(name,el) {
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  document.getElementById('page-'+name).classList.add('active');
+  el.classList.add('active');
+  updateStats(); renderEntries();
+  const titles={heute:'Zeiterfassung',eintraege:'Einträge',soll:'Sollzeit',uebersicht:'Übersicht'};
+  document.getElementById('headerTitle').textContent=titles[name];
+}
+function changeMonth(dir) {
+  state.currentMonth+=dir;
+  if(state.currentMonth<0){state.currentMonth=11;state.currentYear--;}
+  if(state.currentMonth>11){state.currentMonth=0;state.currentYear++;}
+  save(); updateStats(); renderEntries(); updateHeaderDate();
+}
+function updateHeaderDate() {
+  const now=new Date();
+  document.getElementById('headerDate').textContent=WEEKDAYS[now.getDay()]+', '+now.getDate()+'. '+MONTHS[now.getMonth()]+' '+now.getFullYear();
+  document.getElementById('todayWeekday').textContent=MONTHS[state.currentMonth]+' '+state.currentYear;
+  document.getElementById('pdfSubtitle').textContent=MONTHS[state.currentMonth]+' '+state.currentYear+' · '+state.entries.filter(e=>{const d=new Date(e.date);return d.getMonth()===state.currentMonth&&d.getFullYear()===state.currentYear;}).length+' Einträge';
+}
+
+// ===== MODAL =====
+function closeModal(id){document.getElementById(id).classList.remove('open');}
+document.querySelectorAll('.modal-overlay').forEach(o=>{o.addEventListener('click',e=>{if(e.target===o)o.classList.remove('open');});});
+
+// ===== UTILS =====
+function formatTime(date){return String(date.getHours()).padStart(2,'0')+':'+String(date.getMinutes()).padStart(2,'0');}
+function formatMinutes(min){const h=Math.floor(min/60),m=Math.round(min%60);return `${h}:${String(m).padStart(2,'0')}`;}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+// ===== INIT =====
+onTypeChange();
+renderSollDisplay();
+updateStats();
+renderEntries();
+document.getElementById('urlaubAnspruchValue').textContent=state.urlaubAnspruch+' Tage';
+document.getElementById('pauseAutoValue').textContent=state.pauseAuto+' min';
+updateHeaderDate();
+if(state.today.kommen) document.getElementById('statusKommen').textContent=formatTime(new Date(state.today.kommen));
+if(state.today.gehen) document.getElementById('statusGehen').textContent=formatTime(new Date(state.today.gehen));
+</script>
+</body>
+</html>
